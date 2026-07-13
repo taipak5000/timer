@@ -380,9 +380,12 @@
     <div id="toast" class="ios-toast"></div>
 
     <div id="timer-container">
-        <div class="app-header">
-            <div class="app-title">Sky RTA Timer</div>
-            <div class="app-subtitle">星を紡ぐ子供たち</div>
+        <div class="app-header" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+            <div>
+                <div class="app-title">Sky RTA Timer</div>
+                <div class="app-subtitle">星を紡ぐ子供たち</div>
+            </div>
+            <a href="https://taipak5000.github.io/skyzztai.management.tool/" style="flex-shrink: 0; color: var(--accent); font-size: 0.72rem; font-weight: 600; text-decoration: none; white-space: nowrap; padding: 7px 10px; background: var(--card-bg); border-radius: 10px;">🕯️ 計算機へ</a>
         </div>
 
         <div class="ios-card">
@@ -416,6 +419,26 @@
                 <button class="btn-text-action" onclick="addNewItem()">追加</button>
             </div>
         </div>
+
+        <div class="ios-card">
+            <div class="ios-row no-border" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                <span class="ios-row-label">🧮 計算機のルートを読込</span>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="spell-input" placeholder="ルート呪文を貼り付け" style="flex: 1; min-width: 0; background: var(--fill); border: none; border-radius: 9px; padding: 9px 12px; color: var(--label); font-size: 0.78rem; font-family: var(--font-mono);">
+                    <button class="btn-text-action" onclick="loadFromSpellInput()" style="flex-shrink: 0;">読込</button>
+                </div>
+            </div>
+        </div>
+
+        <details class="ios-card" style="padding: 2px 16px;">
+            <summary style="padding: 12px 0; cursor: pointer; font-size: 0.95rem; color: var(--label);">🔗 関連ツール</summary>
+            <div style="padding: 2px 0 14px; display: flex; flex-direction: column; gap: 10px;">
+                <a href="https://taipak5000.github.io/skyzztai.management.tool/" style="color: var(--accent); font-size: 0.85rem; text-decoration: none;">🕯️ キャンドル計算機</a>
+                <a href="https://taipak5000.github.io/companion/" style="color: var(--accent); font-size: 0.85rem; text-decoration: none;">✨ 精霊同行ツール</a>
+                <a href="https://taipak5000.github.io/share/" style="color: var(--accent); font-size: 0.85rem; text-decoration: none;">📍 創作物管理ツール</a>
+                <a href="https://taipak5000.github.io/item/" style="color: var(--accent); font-size: 0.85rem; text-decoration: none;">📁 アイテム所持管理</a>
+            </div>
+        </details>
 
         <div class="timer-display">
             <div class="realtime-log" id="realtime-start">開始時刻 --:--:--</div>
@@ -474,7 +497,65 @@
             loadKeybind();
             loadMysetData("1");
             setupKeyboardListener();
+
+            // 計算機から ?spell=... 付きで開かれた場合、そのルートを自動で読み込む
+            const params = new URLSearchParams(window.location.search);
+            const spellFromUrl = params.get("spell");
+            if (spellFromUrl) {
+                try {
+                    applyDecodedRoute(decodeRouteSpell(spellFromUrl));
+                } catch (e) {
+                    showToast("URLの呪文の読み込みに失敗しました");
+                }
+                // アドレスバーに呪文を残さない（再読み込み時の再適用や誤共有を防ぐ）
+                history.replaceState(null, "", window.location.pathname);
+            }
         };
+
+        // 🧮 計算機の「ルート呪文」（Base64化されたJSON）を読み込む処理。
+        // 計算機側の generateRouteSpell / applyRouteSpell と同じ形式を前提にしている。
+        function decodeRouteSpell(spellText) {
+            const binString = atob(spellText.trim());
+            const bytes = Uint8Array.from(binString, c => c.charCodeAt(0));
+            const json = new TextDecoder().decode(bytes);
+            return JSON.parse(json);
+        }
+
+        // デコードしたルートデータをRTAタイマーのセグメントに変換して反映する
+        function applyDecodedRoute(data) {
+            if (isRunning) {
+                showToast("計測中は読み込めません");
+                return;
+            }
+            if (!data || !Array.isArray(data.spots) || data.spots.length === 0) {
+                showToast("有効なルートデータが見つかりませんでした");
+                return;
+            }
+            segments = data.spots.map(sp => {
+                const isGenericSpotName = sp.spotName === "エリア全体" || sp.spotName === "エリア合計";
+                const label = isGenericSpotName ? (sp.subName || sp.spotName) : `${sp.subName}(${sp.spotName})`;
+                return { name: label, lights: sp.light || "" };
+            });
+            pbRecords = {};
+            resetTimer();
+            showToast(`「${data.name || "ルート"}」を読み込みました（${segments.length}項目）`);
+        }
+
+        // 貼り付けボックスからの手動読込
+        function loadFromSpellInput() {
+            const input = document.getElementById("spell-input");
+            const text = input.value.trim();
+            if (!text) {
+                showToast("呪文を貼り付けてください");
+                return;
+            }
+            try {
+                applyDecodedRoute(decodeRouteSpell(text));
+                input.value = "";
+            } catch (e) {
+                showToast("呪文の読み込みに失敗しました");
+            }
+        }
 
         // トースト通知（iOS風の一時的な通知表示。alertの代わりに使用）
         function showToast(message) {
