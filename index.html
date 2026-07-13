@@ -2,263 +2,447 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Sky RTA Timer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
-            --bg-color: #1e1e2e;
-            --panel-bg: #252538;
-            --text-color: #cdd6f4;
-            --accent-color: #89b4fa;
-            --success-color: #a6e3a1;
-            --danger-color: #f38ba8;
-            --active-bg: #313244;
+            color-scheme: dark;
+            --bg: #161618;
+            --card-bg: #232326;
+            --fill: #323235;
+            --fill-secondary: #3F3F43;
+            --label: #FFFFFF;
+            --label-secondary: #9A9AA0;
+            --label-tertiary: #737378;
+            --separator: rgba(120, 120, 128, 0.4);
+            --accent: #0A84FF;
+            --green: #30D158;
+            --red: #FF453A;
+            --orange: #FF9F0A;
+            --purple: #BF5AF2;
+            --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --font-mono: ui-monospace, "SF Mono", Menlo, "Cascadia Code", monospace;
+        }
+
+        html {
+            background: var(--bg);
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Helvetica Neue', Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            background-color: #11111b;
-            color: var(--text-color);
+            background: var(--bg);
+            color: var(--label);
+            font-family: var(--font-ui);
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 10px;
+            padding: 16px 10px calc(16px + env(safe-area-inset-bottom));
             min-height: 100vh;
+            overscroll-behavior-y: none;
         }
 
-        /* タイマー全体のコンテナ（横幅固定・LiveSplit風） */
         #timer-container {
             width: 100%;
-            max-width: 400px;
-            background-color: var(--bg-color);
-            border-radius: 12px;
-            padding: 15px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            max-width: 420px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 20px;
+            background: var(--bg);
+            padding: 20px 14px;
+            border-radius: 24px;
         }
 
-        /* ヘッダー・設定エリア */
-        .config-panel {
-            background-color: var(--panel-bg);
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 0.9rem;
-        }
+        /* ヘッダー */
+        .app-header { padding: 0 6px; }
+        .app-title { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.03em; }
+        .app-subtitle { font-size: 0.8rem; color: var(--label-secondary); margin-top: 2px; }
 
-        .flex-row {
+        /* iOS風グループカード（設定エリア） */
+        .ios-card { background: var(--card-bg); border-radius: 16px; overflow: hidden; }
+
+        .ios-row {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
-            gap: 5px;
+            justify-content: space-between;
+            padding: 12px 16px;
+            min-height: 44px;
+            gap: 10px;
+            border-bottom: 0.5px solid var(--separator);
         }
+        .ios-row.no-border { border-bottom: none; }
+        .ios-row.action { justify-content: center; }
+        .ios-row.action span { color: var(--accent); font-weight: 600; font-size: 0.9rem; }
+        .ios-row-label { font-size: 0.95rem; }
+        .ios-row-value {
+            color: var(--label-secondary);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .ios-row.tappable { cursor: pointer; }
+        .ios-row.tappable:active { background: var(--fill); }
+        .chevron { color: var(--label-tertiary); width: 9px; height: 9px; flex-shrink: 0; }
 
-        select, button, input {
-            background: #45475a;
-            color: var(--text-color);
+        /* セグメンテッドコントロール（マイセット） */
+        .segmented-control {
+            display: flex;
+            background: var(--fill);
+            border-radius: 9px;
+            padding: 2px;
+            gap: 2px;
+            width: 132px;
+        }
+        .seg-btn {
+            flex: 1;
             border: none;
-            padding: 6px 10px;
-            border-radius: 4px;
-            cursor: pointer;
+            background: transparent;
+            color: var(--label-secondary);
             font-size: 0.85rem;
+            font-weight: 600;
+            font-family: var(--font-ui);
+            padding: 6px 0;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: background-color 0.15s ease, color 0.15s ease;
         }
-        input[type="number"], input[type="text"] {
-            cursor: text;
+        .seg-btn.active {
+            background: var(--fill-secondary);
+            color: var(--label);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
         }
 
-        /* メインタイム表示 */
+        /* iOS風トグルスイッチ */
+        .ios-switch { position: relative; display: block; width: 48px; height: 28px; flex-shrink: 0; }
+        .ios-switch input {
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            position: absolute;
+            cursor: pointer;
+            z-index: 1;
+        }
+        .switch-track {
+            position: absolute;
+            inset: 0;
+            background: var(--fill-secondary);
+            border-radius: 999px;
+            transition: background-color 0.2s ease;
+        }
+        .switch-thumb {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 24px;
+            height: 24px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .ios-switch input:checked ~ .switch-track { background: var(--green); }
+        .ios-switch input:checked ~ .switch-track .switch-thumb { transform: translateX(20px); }
+
+        /* 項目追加フォーム */
+        .add-item-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-top: 0.5px solid var(--separator);
+        }
+        .add-item-row input {
+            flex: 1;
+            background: var(--fill);
+            border: none;
+            border-radius: 9px;
+            padding: 9px 12px;
+            color: var(--label);
+            font-size: 0.9rem;
+            font-family: var(--font-ui);
+        }
+        .add-item-row input::placeholder { color: var(--label-tertiary); }
+        .btn-text-action {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 0.9rem;
+            font-family: var(--font-ui);
+            padding: 6px 4px;
+            cursor: pointer;
+        }
+        .btn-text-action:active { opacity: 0.5; }
+
+        /* タイマー表示 */
+        .timer-display { text-align: center; padding: 4px 0; }
+        .realtime-log { font-size: 0.72rem; font-weight: 500; color: var(--label-secondary); font-family: var(--font-mono); }
         .total-time-display {
-            font-size: 3rem;
-            font-weight: bold;
-            text-align: right;
-            font-family: monospace;
-            color: var(--accent-color);
-            text-shadow: 0 0 10px rgba(137, 180, 250, 0.3);
-            line-height: 1;
-            margin: 10px 0;
+            font-size: 3.2rem;
+            font-weight: 800;
+            color: var(--label);
+            font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.01em;
+            line-height: 1.15;
+            margin: 2px 0;
         }
 
-        .realtime-log {
-            font-size: 0.75rem;
-            color: #a6adc8;
-            text-align: right;
-        }
-
-        /* セグメント（項目）リストエリア */
+        /* セグメントリストカード */
         .segments-wrapper {
-            max-height: 250px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            max-height: min(46vh, 440px);
             overflow-y: auto;
-            border: 1px solid #313244;
-            border-radius: 6px;
-            position: relative;
+            overflow-x: hidden;
             scroll-behavior: smooth;
         }
 
         .segment-item {
             display: flex;
             align-items: center;
-            padding: 8px;
-            border-bottom: 1px solid #313244;
-            background-color: var(--bg-color);
-            transition: all 0.2s ease;
-            gap: 5px;
+            gap: 8px;
+            padding: 10px 16px;
+            border-bottom: 0.5px solid var(--separator);
+            transition: background-color 0.2s ease, padding 0.2s ease;
         }
+        .segment-item:last-child { border-bottom: none; }
 
-        /* 計測中の項目を大きく */
         .segment-item.active {
-            background-color: var(--active-bg);
-            transform: scale(1.02);
-            border: 1px solid var(--accent-color);
-            font-size: 1.15rem;
-            font-weight: bold;
+            background: linear-gradient(90deg, rgba(10,132,255,0.18), rgba(10,132,255,0.03) 75%);
+            box-shadow: inset 3px 0 0 var(--accent);
+            padding-top: 14px;
+            padding-bottom: 14px;
         }
+        .segment-item.active .segment-name { font-size: 1.05rem; font-weight: 700; }
+        .segment-item.active .current-time { font-size: 1.25rem; font-weight: 700; }
 
-        /* 横幅を伸ばさないための省略設定 */
         .segment-name {
             flex: 1;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             min-width: 0;
+            font-size: 0.95rem;
         }
 
-        .segment-inputs {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
         .light-input {
-            width: 45px;
+            width: 44px;
             text-align: center;
-            padding: 2px;
+            background: var(--fill);
+            border: none;
+            border-radius: 7px;
+            color: var(--label);
+            font-size: 0.8rem;
+            padding: 6px 2px;
+            font-family: var(--font-ui);
+            flex-shrink: 0;
         }
+        .light-input::placeholder { color: var(--label-tertiary); }
 
         .segment-times {
             text-align: right;
-            font-family: monospace;
-            min-width: 110px;
-            font-size: 0.85rem;
+            font-family: var(--font-mono);
+            min-width: 92px;
+            flex-shrink: 0;
         }
-        .segment-item.active .segment-times {
-            font-size: 1rem;
-        }
+        .current-time { font-size: 0.95rem; font-weight: 600; color: var(--label); font-variant-numeric: tabular-nums; }
+        .pb-diff { font-size: 0.72rem; display: block; font-weight: 600; }
+        .diff-plus { color: var(--red); }
+        .diff-minus { color: var(--green); }
+        .efficiency { font-size: 0.68rem; color: var(--orange); display: block; }
+        .pb-time { font-size: 0.68rem; color: var(--label-tertiary); display: block; }
+        .segment-times span:empty { display: none; }
 
-        .pb-diff {
-            font-size: 0.75rem;
-            display: block;
-        }
-        .diff-plus { color: var(--danger-color); }
-        .diff-minus { color: var(--success-color); }
-
-        .efficiency {
-            font-size: 0.7rem;
-            color: #f9e2af;
-            display: block;
-        }
-
-        .pb-time {
-            font-size: 0.7rem;
-            color: #a6adc8;
-            display: block;
-        }
-
-        /* 編集モード用のボタン類 */
-        .edit-controls {
+        /* 編集用アイコンボタン */
+        .edit-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .icon-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: none;
             display: flex;
-            gap: 2px;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #fff;
+            background: var(--fill-secondary);
+            flex-shrink: 0;
+            padding: 0;
         }
-        .edit-controls button {
-            padding: 2px 5px;
-            font-size: 0.75rem;
-        }
+        .icon-btn svg { width: 13px; height: 13px; }
+        .icon-btn.danger { background: var(--red); }
+        .icon-btn:active { opacity: 0.6; }
 
-        /* コントロールボタンエリア */
-        .action-buttons {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
+        /* アクションボタン */
+        .actions { display: flex; flex-direction: column; gap: 10px; }
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            padding: 16px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            font-family: var(--font-ui);
+            cursor: pointer;
+            transition: transform 0.1s ease, opacity 0.1s ease;
         }
-        .btn-main { background-color: var(--accent-color); color: #11111b; font-weight: bold; }
-        .btn-skip { background-color: #fab387; color: #11111b; }
-        .btn-reset { background-color: var(--danger-color); color: #11111b; }
+        .btn-primary:active { transform: scale(0.98); opacity: 0.85; }
 
-        /* スマホ用固定ボトムボタン */
+        .actions-secondary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .btn-tint {
+            border: none;
+            border-radius: 12px;
+            padding: 10px 4px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            font-family: var(--font-ui);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            transition: transform 0.1s ease, opacity 0.1s ease;
+        }
+        .btn-tint:active { transform: scale(0.96); opacity: 0.7; }
+        .btn-skip { background: rgba(255,159,10,0.16); color: var(--orange); }
+        .btn-reset { background: rgba(255,69,58,0.16); color: var(--red); }
+        .btn-share { background: rgba(191,90,242,0.16); color: var(--purple); }
+
+        /* トースト通知 */
+        .ios-toast {
+            position: fixed;
+            top: calc(16px + env(safe-area-inset-top));
+            left: 50%;
+            transform: translateX(-50%) translateY(-12px);
+            background: rgba(44,44,46,0.92);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            color: #fff;
+            padding: 10px 18px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            z-index: 10000;
+            max-width: 85%;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+        }
+        .ios-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* スマホ用固定ボトムバー */
         #mobile-trigger-btn {
             display: none;
             position: fixed;
             bottom: 0;
             left: 0;
             width: 100%;
-            padding: 20px;
-            background-color: var(--accent-color);
-            color: #11111b;
-            font-size: 1.5rem;
-            font-weight: bold;
+            padding: 16px 20px calc(16px + env(safe-area-inset-bottom));
+            background: rgba(28,28,30,0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            color: var(--accent);
+            font-size: 1.1rem;
+            font-weight: 700;
+            font-family: var(--font-ui);
             border: none;
-            border-top-left-radius: 12px;
-            border-top-right-radius: 12px;
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+            border-top: 0.5px solid var(--separator);
             z-index: 9999;
             cursor: pointer;
+            text-align: center;
         }
+        #mobile-trigger-btn:active { background: rgba(44,44,46,0.92); }
 
-        /* レスポンシブ対応（スマホ時のみ下部ボタンを表示し余白を作る） */
         @media (max-width: 768px) {
-            body { padding-bottom: 90px; }
+            body { padding-bottom: 100px; }
             #mobile-trigger-btn { display: block; }
+            .btn-primary { display: none; }
         }
     </style>
 </head>
 <body>
 
+    <div id="toast" class="ios-toast"></div>
+
     <div id="timer-container">
-        <div class="config-panel">
-            <div class="flex-row">
-                <label>マイセット:</label>
-                <select id="myset-select" onchange="switchMyset()">
-                    <option value="1">パターン 1</option>
-                    <option value="2">パターン 2</option>
-                    <option value="3">パターン 3</option>
-                </select>
-                <button onclick="saveMyset()">構成を保存</button>
-            </div>
-            <div class="flex-row">
-                <button onclick="toggleEditMode()" id="edit-mode-btn">項目編集モード: オフ</button>
-                <div>
-                    <span style="font-size:0.75rem">PCキー設定:</span>
-                    <button id="keybind-btn" onclick="changeKeybind()">Space</button>
+        <div class="app-header">
+            <div class="app-title">Sky RTA Timer</div>
+            <div class="app-subtitle">星を紡ぐ子供たち</div>
+        </div>
+
+        <div class="ios-card">
+            <div class="ios-row">
+                <span class="ios-row-label">マイセット</span>
+                <div class="segmented-control">
+                    <button class="seg-btn active" data-value="1" onclick="selectMyset('1')">1</button>
+                    <button class="seg-btn" data-value="2" onclick="selectMyset('2')">2</button>
+                    <button class="seg-btn" data-value="3" onclick="selectMyset('3')">3</button>
                 </div>
             </div>
-            <div class="flex-row" id="add-item-form" style="display: none;">
-                <input type="text" id="new-item-name" placeholder="新しい項目名" style="flex:1;">
-                <button onclick="addNewItem()">追加</button>
+            <div class="ios-row tappable action" onclick="saveMyset()">
+                <span>現在の構成をパターンに保存</span>
+            </div>
+            <div class="ios-row">
+                <span class="ios-row-label">項目編集モード</span>
+                <label class="ios-switch">
+                    <input type="checkbox" id="edit-mode-checkbox" onchange="toggleEditMode()">
+                    <span class="switch-track"><span class="switch-thumb"></span></span>
+                </label>
+            </div>
+            <div class="ios-row tappable no-border" onclick="changeKeybind()">
+                <span class="ios-row-label">PCキー設定</span>
+                <span class="ios-row-value">
+                    <span id="keybind-btn">Space</span>
+                    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>
+                </span>
+            </div>
+            <div class="add-item-row" id="add-item-form" style="display: none;">
+                <input type="text" id="new-item-name" placeholder="新しい項目名">
+                <button class="btn-text-action" onclick="addNewItem()">追加</button>
             </div>
         </div>
 
-        <div>
-            <div class="realtime-log" id="realtime-start">開始時刻: --:--:--</div>
+        <div class="timer-display">
+            <div class="realtime-log" id="realtime-start">開始時刻 --:--:--</div>
             <div class="total-time-display" id="total-time">0:00.000</div>
-            <div class="realtime-log" id="realtime-end">終了時刻: --:--:--</div>
+            <div class="realtime-log" id="realtime-end">終了時刻 --:--:--</div>
         </div>
 
         <div class="segments-wrapper" id="segments-wrapper">
             <div id="segments-list"></div>
         </div>
 
-        <div class="action-buttons">
-            <button class="btn-main" id="btn-start-split" onclick="handlePrimaryAction()">START / SPLIT</button>
-            <button class="btn-skip" onclick="skipSegment()">SKIP</button>
-            <button class="btn-reset" onclick="resetTimer()">RESET</button>
-            <button style="background-color: #cba6f7; color: #11111b;" onclick="captureTimer()">画像として共有保存</button>
+        <div class="actions">
+            <button class="btn-primary" id="btn-start-split" onclick="handlePrimaryAction()">START / SPLIT</button>
+            <div class="actions-secondary">
+                <button class="btn-tint btn-skip" onclick="skipSegment()">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+                    <span>SKIP</span>
+                </button>
+                <button class="btn-tint btn-reset" onclick="resetTimer()">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                    <span>RESET</span>
+                </button>
+                <button class="btn-tint btn-share" onclick="captureTimer()">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                    <span>共有</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -283,6 +467,7 @@
         let segmentTimes = []; 
         let targetKey = "Space";
         let isEditing = false;
+        let toastTimer = null;
 
         // 初期化ロード
         window.onload = function() {
@@ -290,6 +475,15 @@
             loadMysetData("1");
             setupKeyboardListener();
         };
+
+        // トースト通知（iOS風の一時的な通知表示。alertの代わりに使用）
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            toast.textContent = message;
+            toast.classList.add("show");
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toast.classList.remove("show"), 2000);
+        }
 
         // キーバインド読み込み
         function loadKeybind() {
@@ -306,6 +500,8 @@
             btn.innerText = "キーを押してください...";
             const captureKey = (e) => {
                 e.preventDefault();
+                // 修飾キー単体は割り当て不可（誤操作防止）
+                if (["Shift", "Control", "Alt", "Meta"].includes(e.key)) return;
                 targetKey = e.key === " " ? "Space" : e.key;
                 btn.innerText = targetKey;
                 localStorage.setItem("sky_rta_keybind", targetKey === "Space" ? " " : targetKey);
@@ -345,8 +541,15 @@
             renderSegments();
         }
 
-        function switchMyset() {
-            const setNum = document.getElementById("myset-select").value;
+        // マイセット選択（セグメンテッドコントロール）
+        function selectMyset(setNum) {
+            if (isRunning) {
+                showToast("計測中はマイセットを切り替えられません");
+                return;
+            }
+            document.querySelectorAll('.seg-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.value === setNum);
+            });
             loadMysetData(setNum);
         }
 
@@ -357,7 +560,7 @@
                 if (input) seg.lights = input.value;
             });
             localStorage.setItem(`sky_rta_myset_${currentMyset}`, JSON.stringify(segments));
-            alert(`パターン ${currentMyset} を保存しました！`);
+            showToast(`パターン ${currentMyset} を保存しました`);
         }
 
         // 画面描画
@@ -372,13 +575,13 @@
 
                 // 自己ベストタイム（PB）の取得
                 const pbTime = pbRecords[idx] || null;
-                let pbDisplay = pbTime ? formatTime(pbTime) : "--:--.---";
-                let pbSpan = pbTime ? `<span class="pb-time">PB ${pbDisplay}</span>` : '';
+                let pbDisplay = pbTime ? `PB ${formatTime(pbTime)}` : '';
 
                 // 計測データの生成
                 let currentDisp = "--:--.---";
-                let diffSpan = "";
-                let effSpan = "";
+                let diffClass = "pb-diff";
+                let diffText = "";
+                let effText = "";
 
                 if (segmentTimes[idx] !== undefined) {
                     if (segmentTimes[idx] === "SKIP") {
@@ -389,38 +592,39 @@
                         if (seg.lights && segmentTimes[idx] > 0) {
                             const sec = segmentTimes[idx] / 1000;
                             const eff = (parseInt(seg.lights) / sec).toFixed(3);
-                            effSpan = `<span class="efficiency">効率: ${eff} 個/秒</span>`;
+                            effText = `効率: ${eff} 個/秒`;
                         }
 
-                        // PBとの差分計算
+                        // PBとの差分計算（確定値）
                         if (pbTime) {
                             const diff = segmentTimes[idx] - pbTime;
-                            if (diff > 0) {
-                                diffSpan = `<span class="pb-diff diff-plus">+${formatTime(diff)}</span>`;
-                            } else {
-                                diffSpan = `<span class="pb-diff diff-minus">-${formatTime(Math.abs(diff))}</span>`;
-                            }
+                            diffClass += diff > 0 ? " diff-plus" : " diff-minus";
+                            diffText = (diff > 0 ? "+" : "-") + formatTime(Math.abs(diff));
                         }
                     }
                 }
 
                 item.innerHTML = `
                     <div class="segment-name" title="${seg.name}">${seg.name}</div>
-                    <div class="segment-inputs">
-                        <input type="number" class="light-input" id="light-idx-${idx}" placeholder="火種" value="${seg.lights || ''}" onchange="segments[${idx}].lights=this.value" ${isRunning?'disabled':''}>
-                    </div>
+                    <input type="number" class="light-input" id="light-idx-${idx}" placeholder="火種" value="${seg.lights || ''}" onchange="segments[${idx}].lights=this.value">
                     ${isEditing ? `
                         <div class="edit-controls">
-                            <button onclick="moveItem(${idx}, -1)">▲</button>
-                            <button onclick="moveItem(${idx}, 1)">▼</button>
-                            <button onclick="deleteItem(${idx})" style="background-color:var(--danger-color)">×</button>
+                            <button class="icon-btn danger" onclick="deleteItem(${idx})" aria-label="削除">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            </button>
+                            <button class="icon-btn" onclick="moveItem(${idx}, -1)" aria-label="上へ移動">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                            </button>
+                            <button class="icon-btn" onclick="moveItem(${idx}, 1)" aria-label="下へ移動">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                            </button>
                         </div>
                     ` : ''}
                     <div class="segment-times">
-                        <div>${currentDisp}</div>
-                        ${pbSpan}
-                        ${diffSpan}
-                        ${effSpan}
+                        <div class="current-time" id="time-idx-${idx}">${currentDisp}</div>
+                        <span class="${diffClass}" id="diff-idx-${idx}">${diffText}</span>
+                        <span class="pb-time" id="pb-idx-${idx}">${pbDisplay}</span>
+                        <span class="efficiency" id="eff-idx-${idx}">${effText}</span>
                     </div>
                 `;
                 listContainer.appendChild(item);
@@ -432,12 +636,16 @@
             if (isEditing) return;
 
             if (!isRunning && currentSegmentIndex === -1) {
+                if (segments.length === 0) {
+                    showToast("項目がありません。エディットモードで項目を追加してください");
+                    return;
+                }
                 // タイマースタート
                 isRunning = true;
                 currentSegmentIndex = 0;
                 startTime = performance.now();
-                document.getElementById("realtime-start").innerText = `開始時刻: ${new Date().toLocaleTimeString()}`;
-                document.getElementById("realtime-end").innerText = `終了時刻: --:--:--`;
+                document.getElementById("realtime-start").innerText = `開始時刻 ${new Date().toLocaleTimeString()}`;
+                document.getElementById("realtime-end").innerText = `終了時刻 --:--:--`;
                 document.getElementById("btn-start-split").innerText = "SPLIT";
                 document.getElementById("mobile-trigger-btn").innerText = "TAP TO SPLIT";
                 
@@ -460,6 +668,8 @@
                 // 自己ベストの更新チェック（スキップされてない場合）
                 if (!pbRecords[currentSegmentIndex] || thisSegmentTime < pbRecords[currentSegmentIndex]) {
                     pbRecords[currentSegmentIndex] = thisSegmentTime;
+                    // 更新した時点で即保存（走破を最後までしなくてもベストは残る）
+                    localStorage.setItem(`sky_rta_pb_${currentMyset}`, JSON.stringify(pbRecords));
                 }
 
                 if (currentSegmentIndex < segments.length - 1) {
@@ -468,7 +678,7 @@
                     renderSegments();
                     autoScrollToActive();
                 } else {
-                    // 全全項目ストップ（完全終了）
+                    // 全項目ストップ（完全終了）
                     endTimer(totalElapsed);
                 }
             }
@@ -486,10 +696,6 @@
                 autoScrollToActive();
             } else {
                 // 最後の項目でスキップされた場合もタイマー終了
-                let previousTotals = 0;
-                for(let i=0; i<currentSegmentIndex; i++) {
-                    if(segmentTimes[i] !== "SKIP") previousTotals += segmentTimes[i];
-                }
                 endTimer(performance.now() - startTime);
             }
         }
@@ -498,7 +704,7 @@
         function endTimer(finalTime) {
             isRunning = false;
             cancelAnimationFrame(timerInterval);
-            document.getElementById("realtime-end").innerText = `終了時刻: ${new Date().toLocaleTimeString()}`;
+            document.getElementById("realtime-end").innerText = `終了時刻 ${new Date().toLocaleTimeString()}`;
             document.getElementById("total-time").innerText = formatTime(finalTime);
             document.getElementById("btn-start-split").innerText = "FINISHED";
             document.getElementById("mobile-trigger-btn").innerText = "FINISHED";
@@ -507,6 +713,8 @@
             localStorage.setItem(`sky_rta_pb_${currentMyset}`, JSON.stringify(pbRecords));
             currentSegmentIndex = -1;
             renderSegments();
+            // 全項目を見返せるよう一覧を先頭までスクロール
+            document.getElementById("segments-wrapper").scrollTop = 0;
         }
 
         // タイマー更新ループ
@@ -523,10 +731,18 @@
             }
             const activeTime = elapsed - previousTotals;
             
-            const activeItem = document.getElementById(`seg-item-${currentSegmentIndex}`);
-            if (activeItem) {
-                const timeDiv = activeItem.querySelector(".segment-times div");
-                if (timeDiv) timeDiv.innerText = formatTime(activeTime);
+            const timeEl = document.getElementById(`time-idx-${currentSegmentIndex}`);
+            if (timeEl) timeEl.innerText = formatTime(activeTime);
+
+            // 計測しながら自己ベストとの差分（プラスマイナス）をリアルタイム表示
+            const diffEl = document.getElementById(`diff-idx-${currentSegmentIndex}`);
+            if (diffEl) {
+                const pbTime = pbRecords[currentSegmentIndex];
+                if (pbTime) {
+                    const diff = activeTime - pbTime;
+                    diffEl.textContent = (diff > 0 ? "+" : "-") + formatTime(Math.abs(diff));
+                    diffEl.className = "pb-diff " + (diff > 0 ? "diff-plus" : "diff-minus");
+                }
             }
 
             timerInterval = requestAnimationFrame(updateTimer);
@@ -548,8 +764,8 @@
             currentSegmentIndex = -1;
             segmentTimes = [];
             document.getElementById("total-time").innerText = "0:00.000";
-            document.getElementById("realtime-start").innerText = "開始時刻: --:--:--";
-            document.getElementById("realtime-end").innerText = "終了時刻: --:--:--";
+            document.getElementById("realtime-start").innerText = "開始時刻 --:--:--";
+            document.getElementById("realtime-end").innerText = "終了時刻 --:--:--";
             document.getElementById("btn-start-split").innerText = "START / SPLIT";
             document.getElementById("mobile-trigger-btn").innerText = "TAP TO START / SPLIT";
             renderSegments();
@@ -567,9 +783,13 @@
 
         // 編集モード切り替え
         function toggleEditMode() {
-            if (isRunning) return alert("計測中は編集できません");
-            isEditing = !isEditing;
-            document.getElementById("edit-mode-btn").innerText = isEditing ? "項目編集モード: オン" : "項目編集モード: オフ";
+            const checkbox = document.getElementById("edit-mode-checkbox");
+            if (isRunning) {
+                checkbox.checked = isEditing;
+                showToast("計測中は編集できません");
+                return;
+            }
+            isEditing = checkbox.checked;
             document.getElementById("add-item-form").style.display = isEditing ? "flex" : "none";
             renderSegments();
         }
@@ -631,12 +851,13 @@
             const originalMaxHeight = wrapper.style.maxHeight;
             wrapper.style.maxHeight = "none"; 
 
-            html2canvas(container, { backgroundColor: "#11111b" }).then(canvas => {
+            html2canvas(container, { backgroundColor: "#000000" }).then(canvas => {
                 wrapper.style.maxHeight = originalMaxHeight;
                 const link = document.createElement("a");
                 link.download = `Sky_RTA_${new Date().toISOString().slice(0,10)}.png`;
                 link.href = canvas.toDataURL();
                 link.click();
+                showToast("画像を保存しました");
             });
         }
     </script>
