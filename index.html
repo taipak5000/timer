@@ -8,6 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Sky RTA Timer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="areas-data.js"></script>
     <style>
         :root {
             color-scheme: dark;
@@ -173,6 +174,103 @@
             font-family: var(--font-ui);
         }
         .add-item-row input::placeholder { color: var(--label-tertiary); }
+
+        /* エリアから項目を追加するピッカー */
+        .area-picker-search {
+            width: 100%;
+            background: var(--fill);
+            border: none;
+            border-radius: 9px;
+            padding: 9px 12px;
+            color: var(--label);
+            font-size: 0.85rem;
+            font-family: var(--font-ui);
+            margin-bottom: 10px;
+        }
+        .area-picker-search::placeholder { color: var(--label-tertiary); }
+        .area-picker-tree {
+            max-height: 320px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            border-radius: 12px;
+            background: var(--fill);
+        }
+        .area-picker-area > summary {
+            padding: 10px 10px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            color: var(--label);
+            list-style: none;
+        }
+        .area-picker-area > summary::-webkit-details-marker { display: none; }
+        .area-picker-area:not(:last-child) { border-bottom: 0.5px solid var(--separator); }
+        .area-picker-sub {
+            margin: 0 8px 8px 10px;
+            border-left: 1.5px solid var(--separator);
+            padding-left: 6px;
+        }
+        .area-picker-sub > summary {
+            padding: 6px 6px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--label-secondary);
+            list-style: none;
+        }
+        .area-picker-sub > summary::-webkit-details-marker { display: none; }
+        .area-picker-spot {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px 6px 20px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            border-radius: 8px;
+        }
+        .area-picker-spot:active { background: var(--fill-secondary); }
+        .area-picker-spot input[type="checkbox"] {
+            flex-shrink: 0;
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+        }
+        .area-picker-spot .spot-name {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--label);
+        }
+        .area-picker-spot .spot-light {
+            color: var(--orange);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            flex-shrink: 0;
+        }
+        .area-picker-spot.hidden-by-filter,
+        .area-picker-sub.hidden-by-filter,
+        .area-picker-area.hidden-by-filter { display: none; }
+        .area-picker-missing {
+            padding: 16px 10px;
+            font-size: 0.8rem;
+            color: var(--label-tertiary);
+            text-align: center;
+            line-height: 1.6;
+        }
+        .area-picker-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .area-picker-count { font-size: 0.75rem; color: var(--label-secondary); }
+
+        /* 参考タイム（自己ベスト未計測の項目にareas-data.jsの目安時間を表示） */
+        .ref-time { font-size: 0.68rem; color: var(--label-tertiary); display: block; font-style: italic; }
+
         .btn-text-action {
             background: none;
             border: none;
@@ -198,6 +296,26 @@
             line-height: 1.15;
             margin: 2px 0;
         }
+
+        /* 自己ベスト合計との差分（ペース）表示 */
+        .pace-diff {
+            font-size: 1.15rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
+            min-height: 1.4rem;
+        }
+        .pace-label {
+            font-size: 0.68rem;
+            font-weight: 600;
+            font-family: var(--font-ui);
+            color: var(--label-tertiary);
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        .pace-diff.diff-plus { color: var(--red); }
+        .pace-diff.diff-minus { color: var(--green); }
+        .pace-diff.diff-neutral { color: var(--label-tertiary); }
 
         /* セグメントリストカード */
         .segments-wrapper {
@@ -236,6 +354,20 @@
             min-width: 0;
             font-size: 0.95rem;
         }
+
+        /* 項目名編集用インプット（編集モード中に segment-name の代わりに表示） */
+        .segment-name-input {
+            flex: 1;
+            min-width: 0;
+            font-size: 0.9rem;
+            font-family: var(--font-ui);
+            background: var(--fill);
+            border: none;
+            border-radius: 7px;
+            color: var(--label);
+            padding: 7px 9px;
+        }
+        .segment-name-input::placeholder { color: var(--label-tertiary); }
 
         .light-input {
             width: 44px;
@@ -301,7 +433,7 @@
         }
         .btn-primary:active { transform: scale(0.98); opacity: 0.85; }
 
-        .actions-secondary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .actions-secondary { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; }
         .btn-tint {
             border: none;
             border-radius: 12px;
@@ -317,6 +449,7 @@
             transition: transform 0.1s ease, opacity 0.1s ease;
         }
         .btn-tint:active { transform: scale(0.96); opacity: 0.7; }
+        .btn-undo { background: rgba(10,132,255,0.16); color: var(--accent); }
         .btn-skip { background: rgba(255,159,10,0.16); color: var(--orange); }
         .btn-reset { background: rgba(255,69,58,0.16); color: var(--red); }
         .btn-share { background: rgba(191,90,242,0.16); color: var(--purple); }
@@ -407,12 +540,19 @@
                     <span class="switch-track"><span class="switch-thumb"></span></span>
                 </label>
             </div>
-            <div class="ios-row tappable no-border" onclick="changeKeybind()">
+            <div class="ios-row tappable" onclick="changeKeybind()">
                 <span class="ios-row-label">PCキー設定</span>
                 <span class="ios-row-value">
                     <span id="keybind-btn">Space</span>
                     <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>
                 </span>
+            </div>
+            <div class="ios-row">
+                <span class="ios-row-label">ベスト合計（理論値）</span>
+                <span class="ios-row-value" id="sum-of-best-value">--:--.---</span>
+            </div>
+            <div class="ios-row tappable action no-border" onclick="confirmResetPB()">
+                <span style="color: var(--red);">自己ベストをリセット</span>
             </div>
             <div class="add-item-row" id="add-item-form" style="display: none;">
                 <input type="text" id="new-item-name" placeholder="新しい項目名">
@@ -430,6 +570,18 @@
             </div>
         </div>
 
+        <details class="ios-card" style="padding: 2px 16px 14px;">
+            <summary style="padding: 12px 0; cursor: pointer; font-size: 0.95rem; color: var(--label);">📖 エリアから項目を追加</summary>
+            <div style="padding-top: 4px;">
+                <input type="text" id="area-picker-search" class="area-picker-search" placeholder="エリア・スポット名で検索" oninput="filterAreaPicker()">
+                <div class="area-picker-tree" id="area-picker-tree"></div>
+                <div class="area-picker-footer">
+                    <span class="area-picker-count" id="area-picker-count">0件選択中</span>
+                    <button class="btn-text-action" id="area-picker-add-btn" onclick="addSelectedAreaSpots()">選択した項目を追加</button>
+                </div>
+            </div>
+        </details>
+
         <details class="ios-card" style="padding: 2px 16px;">
             <summary style="padding: 12px 0; cursor: pointer; font-size: 0.95rem; color: var(--label);">🔗 関連ツール</summary>
             <div style="padding: 2px 0 14px; display: flex; flex-direction: column; gap: 10px;">
@@ -443,6 +595,7 @@
         <div class="timer-display">
             <div class="realtime-log" id="realtime-start">開始時刻 --:--:--</div>
             <div class="total-time-display" id="total-time">0:00.000</div>
+            <div class="pace-diff diff-neutral" id="pace-diff"><span class="pace-label">ペース</span>--</div>
             <div class="realtime-log" id="realtime-end">終了時刻 --:--:--</div>
         </div>
 
@@ -453,6 +606,10 @@
         <div class="actions">
             <button class="btn-primary" id="btn-start-split" onclick="handlePrimaryAction()">START / SPLIT</button>
             <div class="actions-secondary">
+                <button class="btn-tint btn-undo" onclick="undoSplit()">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>
+                    <span>戻す</span>
+                </button>
                 <button class="btn-tint btn-skip" onclick="skipSegment()">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
                     <span>SKIP</span>
@@ -492,11 +649,17 @@
         let isEditing = false;
         let toastTimer = null;
 
+        // 直前の分割/スキップ操作（「戻す」ボタンで1回だけ取り消せる）
+        let lastAction = null;
+        // 直近に完走した際の最終ペース差分（リセットするまで表示し続ける）
+        let lastFinalPaceDiff = null;
+
         // 初期化ロード
         window.onload = function() {
             loadKeybind();
             loadMysetData("1");
             setupKeyboardListener();
+            buildAreaPicker();
 
             // 計算機から ?spell=... 付きで開かれた場合、そのルートを自動で読み込む
             const params = new URLSearchParams(window.location.search);
@@ -534,7 +697,11 @@
             segments = data.spots.map(sp => {
                 const isGenericSpotName = sp.spotName === "エリア全体" || sp.spotName === "エリア合計";
                 const label = isGenericSpotName ? (sp.subName || sp.spotName) : `${sp.subName}(${sp.spotName})`;
-                return { name: label, lights: sp.light || "" };
+                const seg = { name: label, lights: sp.light || "" };
+                // 計算機側の目安タイム(秒)を参考タイムとして引き継ぐ（自己ベストが無い間の目安として使用）
+                const refTime = Number(sp.time);
+                if (refTime > 0) seg.refTime = refTime;
+                return seg;
             });
             pbRecords = {};
             resetTimer();
@@ -555,6 +722,110 @@
             } catch (e) {
                 showToast("呪文の読み込みに失敗しました");
             }
+        }
+
+        // 📖 エリアピッカーの構築（areas-data.js の SKY_DEFAULT_AREAS から一覧を生成。初回のみ実行）
+        function buildAreaPicker() {
+            const container = document.getElementById("area-picker-tree");
+            const addBtn = document.getElementById("area-picker-add-btn");
+            const searchInput = document.getElementById("area-picker-search");
+            if (!container) return;
+
+            if (typeof SKY_DEFAULT_AREAS === "undefined" || !Array.isArray(SKY_DEFAULT_AREAS) || SKY_DEFAULT_AREAS.length === 0) {
+                container.innerHTML = `<div class="area-picker-missing">areas-data.js が読み込めませんでした。<br>index.html と同じフォルダに areas-data.js を置いてください。</div>`;
+                if (addBtn) addBtn.style.display = "none";
+                if (searchInput) searchInput.style.display = "none";
+                return;
+            }
+
+            let html = "";
+            SKY_DEFAULT_AREAS.forEach(area => {
+                if (!area || !Array.isArray(area.subAreas) || area.subAreas.length === 0) return;
+                const areaName = area.name || "無題エリア";
+                html += `<details class="area-picker-area"><summary>${escapeHtml(areaName)}</summary>`;
+                area.subAreas.forEach(sub => {
+                    if (!sub || !Array.isArray(sub.spots) || sub.spots.length === 0) return;
+                    const subName = sub.name || "無題";
+                    const subTime = Number(sub.time) || 0;
+                    html += `<details class="area-picker-sub"><summary>${escapeHtml(subName)}</summary>`;
+                    sub.spots.forEach(spot => {
+                        if (!spot) return;
+                        const spotName = spot.name || "無題スポット";
+                        const light = (spot.light !== undefined && spot.light !== null) ? spot.light : "";
+                        const filterText = escapeHtml(`${areaName} ${subName} ${spotName}`);
+                        html += `<label class="area-picker-spot" data-filter-text="${filterText}">
+                            <input type="checkbox" data-main="${escapeHtml(areaName)}" data-sub="${escapeHtml(subName)}" data-spot="${escapeHtml(spotName)}" data-light="${escapeHtml(String(light))}" data-time="${subTime}" onchange="updateAreaPickerCount()">
+                            <span class="spot-name">${escapeHtml(spotName)}</span>
+                            <span class="spot-light">🔥${escapeHtml(String(light))}</span>
+                        </label>`;
+                    });
+                    html += `</details>`;
+                });
+                html += `</details>`;
+            });
+            container.innerHTML = html;
+        }
+
+        // 検索ボックスの入力に応じて該当するエリア/サブエリア/スポットだけを表示する
+        function filterAreaPicker() {
+            const searchInput = document.getElementById("area-picker-search");
+            const q = searchInput ? searchInput.value.trim().toLowerCase() : "";
+
+            document.querySelectorAll("#area-picker-tree > .area-picker-area").forEach(areaEl => {
+                let areaHasVisibleSub = false;
+                areaEl.querySelectorAll(":scope > .area-picker-sub").forEach(subEl => {
+                    let subHasVisibleSpot = false;
+                    subEl.querySelectorAll(":scope > .area-picker-spot").forEach(spotEl => {
+                        const text = (spotEl.dataset.filterText || "").toLowerCase();
+                        const visible = !q || text.includes(q);
+                        spotEl.classList.toggle("hidden-by-filter", !visible);
+                        if (visible) subHasVisibleSpot = true;
+                    });
+                    subEl.classList.toggle("hidden-by-filter", !subHasVisibleSpot);
+                    if (subHasVisibleSpot) {
+                        areaHasVisibleSub = true;
+                        if (q) subEl.open = true;
+                    }
+                });
+                areaEl.classList.toggle("hidden-by-filter", !areaHasVisibleSub);
+                if (areaHasVisibleSub && q) areaEl.open = true;
+            });
+        }
+
+        // 選択中のチェックボックス数を表示に反映
+        function updateAreaPickerCount() {
+            const el = document.getElementById("area-picker-count");
+            if (!el) return;
+            const count = document.querySelectorAll("#area-picker-tree input[type='checkbox']:checked").length;
+            el.textContent = `${count}件選択中`;
+        }
+
+        // チェックした項目をまとめて現在のセグメントに追加する
+        function addSelectedAreaSpots() {
+            if (isRunning) {
+                showToast("計測中は追加できません");
+                return;
+            }
+            const checked = document.querySelectorAll("#area-picker-tree input[type='checkbox']:checked");
+            if (checked.length === 0) {
+                showToast("追加する項目を選択してください");
+                return;
+            }
+            checked.forEach(cb => {
+                const subName = cb.dataset.sub || "";
+                const spotName = cb.dataset.spot || "";
+                const isGenericSpotName = spotName === "エリア全体" || spotName === "エリア合計";
+                const label = isGenericSpotName ? (subName || spotName) : `${subName}(${spotName})`;
+                const seg = { name: label, lights: cb.dataset.light || "" };
+                const refTime = Number(cb.dataset.time) || 0;
+                if (refTime > 0) seg.refTime = refTime;
+                segments.push(seg);
+                cb.checked = false;
+            });
+            const addedCount = checked.length;
+            updateAreaPickerCount();
+            renderSegments();
+            showToast(`${addedCount}件の項目を追加しました`);
         }
 
         // トースト通知（iOS風の一時的な通知表示。alertの代わりに使用）
@@ -658,6 +929,9 @@
                 const pbTime = pbRecords[idx] || null;
                 let pbDisplay = pbTime ? `PB ${formatTime(pbTime)}` : '';
 
+                // 自己ベストがまだ無い項目には、areas-data.js由来の参考タイム（平均的なプレイヤーの目安）を表示
+                let refDisplay = (!pbTime && seg.refTime) ? `参考 ${formatRefTime(seg.refTime)}` : '';
+
                 // 計測データの生成
                 let currentDisp = "--:--.---";
                 let diffClass = "pb-diff";
@@ -686,7 +960,10 @@
                 }
 
                 item.innerHTML = `
-                    <div class="segment-name" title="${seg.name}">${seg.name}</div>
+                    ${isEditing
+                        ? `<input type="text" class="segment-name-input" id="name-idx-${idx}" value="${escapeHtml(seg.name)}" placeholder="項目名" onchange="renameItem(${idx}, this.value)">`
+                        : `<div class="segment-name" title="${escapeHtml(seg.name)}">${escapeHtml(seg.name)}</div>`
+                    }
                     <input type="number" class="light-input" id="light-idx-${idx}" placeholder="火種" value="${seg.lights || ''}" onchange="segments[${idx}].lights=this.value">
                     ${isEditing ? `
                         <div class="edit-controls">
@@ -705,11 +982,14 @@
                         <div class="current-time" id="time-idx-${idx}">${currentDisp}</div>
                         <span class="${diffClass}" id="diff-idx-${idx}">${diffText}</span>
                         <span class="pb-time" id="pb-idx-${idx}">${pbDisplay}</span>
+                        <span class="ref-time" id="ref-idx-${idx}">${refDisplay}</span>
                         <span class="efficiency" id="eff-idx-${idx}">${effText}</span>
                     </div>
                 `;
                 listContainer.appendChild(item);
             });
+
+            updateSumOfBestDisplay();
         }
 
         // メイン操作（スタート ＆ スプリット）
@@ -731,6 +1011,8 @@
                 document.getElementById("mobile-trigger-btn").innerText = "TAP TO SPLIT";
                 
                 segmentTimes = [];
+                lastAction = null;
+                lastFinalPaceDiff = null;
                 timerInterval = requestAnimationFrame(updateTimer);
                 renderSegments();
             } else if (isRunning) {
@@ -744,6 +1026,13 @@
                     if(segmentTimes[i] !== "SKIP") previousTotals += segmentTimes[i];
                 }
                 const thisSegmentTime = totalElapsed - previousTotals;
+
+                // 「戻す」用に直前の状態をバックアップ（このスプリットで上書きされる自己ベストを記憶）
+                lastAction = {
+                    index: currentSegmentIndex,
+                    prevPB: pbRecords[currentSegmentIndex]
+                };
+
                 segmentTimes[currentSegmentIndex] = thisSegmentTime;
 
                 // 自己ベストの更新チェック（スキップされてない場合）
@@ -769,6 +1058,8 @@
         function skipSegment() {
             if (!isRunning) return;
 
+            // 「戻す」用に直前の状態をバックアップ
+            lastAction = { index: currentSegmentIndex, wasSkip: true };
             segmentTimes[currentSegmentIndex] = "SKIP";
 
             if (currentSegmentIndex < segments.length - 1) {
@@ -781,6 +1072,38 @@
             }
         }
 
+        // 元に戻す機能（直前のスプリット/スキップを1回だけ取り消し、その項目の計測を再開する）
+        function undoSplit() {
+            if (!isRunning) {
+                showToast("計測中のみ元に戻せます");
+                return;
+            }
+            if (!lastAction || lastAction.index !== currentSegmentIndex - 1) {
+                showToast("元に戻せる操作がありません");
+                return;
+            }
+
+            const idx = lastAction.index;
+
+            // スプリットで自己ベストが更新されていた場合は直前の値に戻す
+            if (!lastAction.wasSkip) {
+                if (lastAction.prevPB === undefined) {
+                    delete pbRecords[idx];
+                } else {
+                    pbRecords[idx] = lastAction.prevPB;
+                }
+                localStorage.setItem(`sky_rta_pb_${currentMyset}`, JSON.stringify(pbRecords));
+            }
+
+            delete segmentTimes[idx];
+            currentSegmentIndex = idx;
+            lastAction = null;
+
+            renderSegments();
+            autoScrollToActive();
+            showToast("直前の操作を取り消しました");
+        }
+
         // タイマー終了処理
         function endTimer(finalTime) {
             isRunning = false;
@@ -789,6 +1112,10 @@
             document.getElementById("total-time").innerText = formatTime(finalTime);
             document.getElementById("btn-start-split").innerText = "FINISHED";
             document.getElementById("mobile-trigger-btn").innerText = "FINISHED";
+
+            // 完走時点でのペース差分を確定させ、リセットするまで表示し続ける
+            lastFinalPaceDiff = calcFinalPaceDiff();
+            updatePaceDiff();
             
             // ローカルストレージに自己ベストデータを保存
             localStorage.setItem(`sky_rta_pb_${currentMyset}`, JSON.stringify(pbRecords));
@@ -826,6 +1153,9 @@
                 }
             }
 
+            // 合計でのペース差分（自己ベストの積み上げとの比較）もリアルタイム更新
+            updatePaceDiff();
+
             timerInterval = requestAnimationFrame(updateTimer);
         }
 
@@ -844,11 +1174,14 @@
             cancelAnimationFrame(timerInterval);
             currentSegmentIndex = -1;
             segmentTimes = [];
+            lastAction = null;
+            lastFinalPaceDiff = null;
             document.getElementById("total-time").innerText = "0:00.000";
             document.getElementById("realtime-start").innerText = "開始時刻 --:--:--";
             document.getElementById("realtime-end").innerText = "終了時刻 --:--:--";
             document.getElementById("btn-start-split").innerText = "START / SPLIT";
             document.getElementById("mobile-trigger-btn").innerText = "TAP TO START / SPLIT";
+            updatePaceDiff();
             renderSegments();
             document.getElementById("segments-wrapper").scrollTop = 0;
         }
@@ -860,6 +1193,143 @@
             const seconds = Math.floor((ms % 60000) / 1000);
             const milliseconds = Math.floor(ms % 1000);
             return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
+        }
+
+        // 参考タイム表示用フォーマット（areas-data.jsの目安秒数はミリ秒精度ではないため M:SS で表示し、実測値と見た目で区別する）
+        function formatRefTime(seconds) {
+            if (!seconds || isNaN(seconds) || seconds < 0) return "";
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // 計測中の合計ペース差分を計算（完了済み区間の差 + 現在計測中の区間のライブ差分）
+        function calcLivePaceDiff() {
+            let diff = 0;
+            let hasData = false;
+
+            for (let i = 0; i < currentSegmentIndex; i++) {
+                const t = segmentTimes[i];
+                if (t === undefined || t === "SKIP") continue;
+                const pb = pbRecords[i];
+                if (pb === undefined) continue;
+                diff += (t - pb);
+                hasData = true;
+            }
+
+            if (currentSegmentIndex >= 0 && currentSegmentIndex < segments.length) {
+                const pb = pbRecords[currentSegmentIndex];
+                if (pb !== undefined) {
+                    let previousTotals = 0;
+                    for (let i = 0; i < currentSegmentIndex; i++) {
+                        if (segmentTimes[i] !== "SKIP" && segmentTimes[i] !== undefined) previousTotals += segmentTimes[i];
+                    }
+                    const activeTime = (performance.now() - startTime) - previousTotals;
+                    diff += (activeTime - pb);
+                    hasData = true;
+                }
+            }
+
+            return hasData ? diff : null;
+        }
+
+        // 完走後、全区間の確定タイムから最終的なペース差分を計算
+        function calcFinalPaceDiff() {
+            let diff = 0;
+            let hasData = false;
+            for (let i = 0; i < segments.length; i++) {
+                const t = segmentTimes[i];
+                if (t === undefined || t === "SKIP") continue;
+                const pb = pbRecords[i];
+                if (pb === undefined) continue;
+                diff += (t - pb);
+                hasData = true;
+            }
+            return hasData ? diff : null;
+        }
+
+        // ペース差分表示の更新（計測中はライブ値、それ以外は直近の完走結果を表示）
+        function updatePaceDiff() {
+            const el = document.getElementById("pace-diff");
+            if (!el) return;
+
+            const diff = isRunning ? calcLivePaceDiff() : lastFinalPaceDiff;
+
+            if (diff === null || diff === undefined) {
+                el.innerHTML = `<span class="pace-label">ペース</span>--`;
+                el.className = "pace-diff diff-neutral";
+                return;
+            }
+            const sign = diff > 0 ? "+" : "-";
+            el.innerHTML = `<span class="pace-label">ペース</span>${sign}${formatTime(Math.abs(diff))}`;
+            el.className = "pace-diff " + (diff > 0 ? "diff-plus" : "diff-minus");
+        }
+
+        // 自己ベスト合計（理論値 / Sum of Best）を計算。全項目分そろっていない場合は算出しない
+        function calcSumOfBest() {
+            if (segments.length === 0) return null;
+            let sum = 0;
+            for (let i = 0; i < segments.length; i++) {
+                const pb = pbRecords[i];
+                if (pb === undefined) return null;
+                sum += pb;
+            }
+            return sum;
+        }
+
+        // 自己ベスト合計表示の更新
+        function updateSumOfBestDisplay() {
+            const el = document.getElementById("sum-of-best-value");
+            if (!el) return;
+            const sum = calcSumOfBest();
+            el.textContent = sum !== null ? formatTime(sum) : "--:--.---";
+        }
+
+        // 自己ベストのリセット（現在のマイセット分のみ）
+        function confirmResetPB() {
+            if (isRunning) {
+                showToast("計測中はリセットできません");
+                return;
+            }
+            if (Object.keys(pbRecords).length === 0) {
+                showToast("リセットする自己ベストがありません");
+                return;
+            }
+            if (confirm(`マイセット${currentMyset}の自己ベストをすべてリセットします。よろしいですか？`)) {
+                pbRecords = {};
+                localStorage.setItem(`sky_rta_pb_${currentMyset}`, JSON.stringify(pbRecords));
+                lastFinalPaceDiff = null;
+                renderSegments();
+                updatePaceDiff();
+                showToast("自己ベストをリセットしました");
+            }
+        }
+
+        // HTML特殊文字のエスケープ（項目名を表示/属性値に安全に埋め込むため）
+        function escapeHtml(str) {
+            if (str === undefined || str === null) return "";
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // 項目名の変更（計測中でなければ、完走後でも変更可能）
+        function renameItem(idx, newName) {
+            const trimmed = newName.trim();
+            if (!trimmed) {
+                showToast("項目名は空にできません");
+                const input = document.getElementById(`name-idx-${idx}`);
+                if (input) input.value = segments[idx].name;
+                return;
+            }
+            // 名前を変えた場合、areas-data.js由来の参考タイムは対応関係が崩れるため破棄する
+            if (trimmed !== segments[idx].name) {
+                delete segments[idx].refTime;
+            }
+            segments[idx].name = trimmed;
         }
 
         // 編集モード切り替え
